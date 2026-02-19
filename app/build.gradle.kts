@@ -7,6 +7,13 @@ plugins {
 }
 
 android {
+	externalNativeBuild {
+		cmake {
+			path = file("src/main/cpp/CMakeLists.txt")
+			version = "3.22.1"
+
+		}
+	}
 	namespace = "org.jellyfin.androidtv"
 	compileSdk = libs.versions.android.compileSdk.get().toInt()
 
@@ -18,6 +25,11 @@ android {
 		applicationId = namespace
 		versionName = project.getVersionName()
 		versionCode = getVersionCode(versionName!!)
+		externalNativeBuild {
+			cmake {
+				cppFlags += ""
+			}
+		}
 	}
 
 	buildFeatures {
