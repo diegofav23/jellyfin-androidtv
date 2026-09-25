@@ -45,14 +45,42 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:imeOptions="actionDone"
+        android:imeOptions="actionNext"
         android:inputType="textUri"
+        android:nextFocusDown="@id/proxy_headers"
+        android:nextFocusForward="@id/proxy_headers"
+        android:privateImeOptions="horizontalAlignment=right"
+        app:layout_constraintEnd_toStartOf="@id/center"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/address_label" />
+
+    <TextView
+        android:id="@+id/proxy_headers_label"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="@string/lbl_proxy_headers"
+        app:layout_constraintEnd_toStartOf="@id/center"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/address" />
+
+    <EditText
+        android:id="@+id/proxy_headers"
+        style="@style/Input.Default"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:hint="@string/lbl_proxy_headers_hint"
+        android:imeOptions="actionDone"
+        android:importantForAutofill="no"
+        android:inputType="text|textNoSuggestions"
+        android:nextFocusUp="@id/address"
         android:nextFocusDown="@id/confirm"
         android:nextFocusForward="@id/confirm"
         android:privateImeOptions="horizontalAlignment=right"
         app:layout_constraintEnd_toStartOf="@id/center"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/address_label" />
+        app:layout_constraintTop_toBottomOf="@id/proxy_headers_label" />
 
     <Button
         android:id="@+id/confirm"
@@ -62,7 +90,7 @@
         android:layout_marginTop="16dp"
         android:text="@string/action_connect"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/address" />
+        app:layout_constraintTop_toBottomOf="@id/proxy_headers" />
 
     <TextView
         android:id="@+id/error"

@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.auth.model.AuthenticationStoreServer
 import org.jellyfin.androidtv.auth.model.ConnectedState
@@ -15,6 +16,7 @@ import org.jellyfin.androidtv.auth.model.ConnectingState
 import org.jellyfin.androidtv.auth.model.Server
 import org.jellyfin.androidtv.auth.model.ServerAdditionState
 import org.jellyfin.androidtv.auth.model.UnableToConnectState
+import org.jellyfin.androidtv.auth.proxy.ProxyHeadersRepository
 import org.jellyfin.androidtv.auth.store.AuthenticationStore
 import org.jellyfin.androidtv.util.sdk.toServer
 import org.jellyfin.sdk.Jellyfin
@@ -46,7 +48,7 @@ interface ServerRepository {
 
 	fun setCurrentServer(server: Server?)
 
-	fun addServer(address: String): Flow<ServerAdditionState>
+	fun addServer(address: String, proxyHeaders: Map<String, String> = emptyMap()): Flow<ServerAdditionState>
 	suspend fun getServer(id: UUID, eagerUpdate: Boolean = false): Server?
 	suspend fun updateServer(server: Server, force: Boolean = false): Boolean
 	suspend fun deleteServer(server: UUID): Boolean
@@ -62,6 +64,7 @@ interface ServerRepository {
 class ServerRepositoryImpl(
 	private val jellyfin: Jellyfin,
 	private val authenticationStore: AuthenticationStore,
+	private val proxyHeadersRepository: ProxyHeadersRepository,
 ) : ServerRepository {
 	// State
 	private val _storedServers = MutableStateFlow(emptyList<Server>())
@@ -75,6 +78,8 @@ class ServerRepositoryImpl(
 
 	// Loading data
 	override suspend fun loadStoredServers() {
+		proxyHeadersRepository.refresh()
+
 		authenticationStore.getServers()
 			.map { (id, entry) -> entry.asServer(id) }
 			.sortedWith(compareByDescending<Server> { it.dateLastAccessed }.thenBy { it.name })
@@ -98,13 +103,26 @@ class ServerRepositoryImpl(
 	}
 
 	// Mutating data
-	override fun addServer(address: String): Flow<ServerAdditionState> = flow {
+	override fun addServer(
+		address: String,
+		proxyHeaders: Map<String, String>,
+	): Flow<ServerAdditionState> = flow {
 		Timber.i("Adding server %s", address)
 
 		emit(ConnectingState(address))
 
 		val addressCandidates = jellyfin.discovery.getAddressCandidates(address)
 		Timber.i("Found ${addressCandidates.size} candidates")
+
+		// Make sure the proxy headers are used while the server is not stored yet
+		if (proxyHeaders.isNotEmpty()) {
+			Timber.i("Using ${proxyHeaders.size} proxy headers")
+			proxyHeadersRepository.setPending(
+				addresses = addressCandidates,
+				headers = proxyHeaders,
+				allowCleartext = address.startsWith("http://", ignoreCase = true),
+			)
+		}
 
 		val goodRecommendations = mutableListOf<RecommendedServerInfo>()
 		val badRecommendations = mutableListOf<RecommendedServerInfo>()
@@ -145,6 +163,9 @@ class ServerRepositoryImpl(
 
 			val id = systemInfo.id!!.toUUID()
 
+			// Keep existing proxy headers when none are provided
+			val serverProxyHeaders = proxyHeaders.ifEmpty { authenticationStore.getServer(id)?.proxyHeaders.orEmpty() }
+
 			val server = authenticationStore.getServer(id)?.copy(
 				name = systemInfo.serverName ?: "Jellyfin Server",
 				address = chosenRecommendation.address,
@@ -152,7 +173,8 @@ class ServerRepositoryImpl(
 				loginDisclaimer = branding.loginDisclaimer,
 				splashscreenEnabled = branding.splashscreenEnabled,
 				setupCompleted = systemInfo.startupWizardCompleted ?: true,
-				lastUsed = Instant.now().toEpochMilli()
+				lastUsed = Instant.now().toEpochMilli(),
+				proxyHeaders = serverProxyHeaders,
 			) ?: AuthenticationStoreServer(
 				name = systemInfo.serverName ?: "Jellyfin Server",
 				address = chosenRecommendation.address,
@@ -160,6 +182,7 @@ class ServerRepositoryImpl(
 				loginDisclaimer = branding.loginDisclaimer,
 				splashscreenEnabled = branding.splashscreenEnabled,
 				setupCompleted = systemInfo.startupWizardCompleted ?: true,
+				proxyHeaders = serverProxyHeaders,
 			)
 
 			authenticationStore.putServer(id, server)
@@ -173,6 +196,9 @@ class ServerRepositoryImpl(
 				.mapValues { (_, entry) -> entry.flatMap { server -> server.issues } }
 			emit(UnableToConnectState(addressCandidatesWithIssues))
 		}
+	}.onCompletion {
+		// Stored servers are used from now on
+		proxyHeadersRepository.clearPending()
 	}.flowOn(Dispatchers.IO)
 
 	override suspend fun getServer(id: UUID, eagerUpdate: Boolean): Server? {

@@ -84,6 +84,8 @@
     <string name="lbl_yes">Yes</string>
     <string name="lbl_enter_server_address">Enter server address</string>
     <string name="lbl_valid_server_address">Please enter the server address (IP or domain/machine name)</string>
+    <string name="lbl_proxy_headers">Authentication proxy headers (optional, e.g. for Pangolin or Cloudflare Access)</string>
+    <string name="lbl_proxy_headers_hint">Name: value | Name: value</string>
     <string name="lbl_ok">Ok</string>
     <string name="lbl_born">"Born "</string>
     <string name="lbl_loading_elipses">Loading…</string>
@@ -303,6 +305,8 @@
     <string name="server_connection_failed">Unable to connect to server</string>
     <string name="server_connection_failed_candidates">Unable to connect to server, tried the following addresses: %1$s</string>
     <string name="server_field_empty">The address cannot be empty</string>
+    <string name="server_proxy_headers_invalid">Invalid proxy header \"%1$s\", use the format Name: value</string>
+    <string name="server_proxy_headers_reserved">The header \"%1$s\" is used by Jellyfin and can\'t be set as proxy header</string>
     <string name="login_authenticating">Authenticating…</string>
     <string name="login_invalid_credentials">Invalid username and/or password</string>
     <string name="login_server_unavailable">Unable to connect to server</string>

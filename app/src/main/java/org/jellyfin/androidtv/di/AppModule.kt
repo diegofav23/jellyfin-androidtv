@@ -12,7 +12,10 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.serviceLoaderEnabled
 import coil3.svg.SvgDecoder
 import coil3.util.Logger
+import okhttp3.OkHttpClient
 import org.jellyfin.androidtv.BuildConfig
+import org.jellyfin.androidtv.auth.proxy.ProxyHeadersInterceptor
+import org.jellyfin.androidtv.auth.proxy.ProxyHeadersRedirectInterceptor
 import org.jellyfin.androidtv.auth.repository.ServerRepository
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.auth.repository.UserRepositoryImpl
@@ -69,7 +72,15 @@ val defaultDeviceInfo = named("defaultDeviceInfo")
 val appModule = module {
 	// SDK
 	single(defaultDeviceInfo) { androidDevice(get()) }
-	single { OkHttpFactory() }
+	single {
+		// Base client shared by the API, WebSocket, image and playback clients
+		val base = OkHttpClient.Builder()
+			.addInterceptor(get<ProxyHeadersInterceptor>())
+			.addNetworkInterceptor(get<ProxyHeadersRedirectInterceptor>())
+			.build()
+
+		OkHttpFactory(base)
+	}
 	single { HttpClientOptions() }
 	single {
 		createJellyfin {

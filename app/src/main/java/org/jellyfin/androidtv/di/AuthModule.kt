@@ -1,6 +1,9 @@
 package org.jellyfin.androidtv.di
 
 import org.jellyfin.androidtv.auth.AccountManagerMigration
+import org.jellyfin.androidtv.auth.proxy.ProxyHeadersInterceptor
+import org.jellyfin.androidtv.auth.proxy.ProxyHeadersRedirectInterceptor
+import org.jellyfin.androidtv.auth.proxy.ProxyHeadersRepository
 import org.jellyfin.androidtv.auth.repository.AuthenticationRepository
 import org.jellyfin.androidtv.auth.repository.AuthenticationRepositoryImpl
 import org.jellyfin.androidtv.auth.repository.ServerRepository
@@ -17,11 +20,14 @@ val authModule = module {
 	single { AccountManagerMigration(get()) }
 	single { AuthenticationStore(get(), get()) }
 	single { AuthenticationPreferences(get()) }
+	single { ProxyHeadersRepository(get()) }
+	single { ProxyHeadersInterceptor(get()) }
+	single { ProxyHeadersRedirectInterceptor(get()) }
 
 	single<AuthenticationRepository> {
 		AuthenticationRepositoryImpl(get(), get(), get(), get(), get(), get(defaultDeviceInfo))
 	}
-	single<ServerRepository> { ServerRepositoryImpl(get(), get()) }
+	single<ServerRepository> { ServerRepositoryImpl(get(), get(), get()) }
 	single<ServerUserRepository> { ServerUserRepositoryImpl(get(), get()) }
 	single<SessionRepository> {
 		SessionRepositoryImpl(get(), get(), get(), get(), get(defaultDeviceInfo), get(), get(), get())

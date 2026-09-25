@@ -17,6 +17,7 @@ import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.model.ConnectedState
 import org.jellyfin.androidtv.auth.model.ConnectingState
 import org.jellyfin.androidtv.auth.model.UnableToConnectState
+import org.jellyfin.androidtv.auth.proxy.ProxyHeadersParser
 import org.jellyfin.androidtv.databinding.FragmentServerAddBinding
 import org.jellyfin.androidtv.ui.startup.ServerAddViewModel
 import org.jellyfin.androidtv.util.getSummary
@@ -37,6 +38,19 @@ class ServerAddFragment : Fragment() {
 		_binding = FragmentServerAddBinding.inflate(inflater, container, false)
 
 		with(binding.address) {
+			setOnEditorActionListener { _, actionId, _ ->
+				when (actionId) {
+					EditorInfo.IME_ACTION_DONE -> {
+						submitAddress()
+						true
+					}
+
+					else -> false
+				}
+			}
+		}
+
+		with(binding.proxyHeaders) {
 			setOnEditorActionListener { _, actionId, _ ->
 				when (actionId) {
 					EditorInfo.IME_ACTION_DONE -> {
@@ -72,6 +86,7 @@ class ServerAddFragment : Fragment() {
 				is ConnectingState -> {
 					// Disable form
 					binding.address.isEnabled = false
+					binding.proxyHeaders.isEnabled = false
 					binding.confirm.isEnabled = false
 					// Update state text
 					binding.error.text = getString(R.string.server_connecting, state.address)
@@ -80,6 +95,7 @@ class ServerAddFragment : Fragment() {
 				is UnableToConnectState -> {
 					// Enable form
 					binding.address.isEnabled = true
+					binding.proxyHeaders.isEnabled = true
 					binding.confirm.isEnabled = true
 					// Update state text
 					binding.error.text = getString(
@@ -113,8 +129,16 @@ class ServerAddFragment : Fragment() {
 		_binding = null
 	}
 
-	private fun submitAddress() = when {
-		binding.address.text.isNotBlank() -> startupViewModel.addServer(binding.address.text.toString())
-		else -> binding.error.setText(R.string.server_field_empty)
+	private fun submitAddress() {
+		if (binding.address.text.isBlank()) {
+			binding.error.setText(R.string.server_field_empty)
+			return
+		}
+
+		when (val result = ProxyHeadersParser.parse(binding.proxyHeaders.text.toString())) {
+			is ProxyHeadersParser.Result.Success -> startupViewModel.addServer(binding.address.text.toString(), result.headers)
+			is ProxyHeadersParser.Result.InvalidHeader -> binding.error.text = getString(R.string.server_proxy_headers_invalid, result.line)
+			is ProxyHeadersParser.Result.ReservedHeader -> binding.error.text = getString(R.string.server_proxy_headers_reserved, result.name)
+		}
 	}
 }
