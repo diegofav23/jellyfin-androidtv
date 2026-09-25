@@ -1,0 +1,86 @@
+name: Fork / Release
+
+on:
+  push:
+    tags:
+      - v*-sso.*
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to build and release (e.g. v0.19.10-sso.1)
+        required: true
+
+env:
+  APPLICATION_ID_SUFFIX: .sso
+  APPLICATION_NAME: Jellyfin SSO
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Java
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+
+      - name: Set version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          VERSION="${INPUT_VERSION:-$GITHUB_REF_NAME}"
+          VERSION="v${VERSION#v}"
+          echo "RELEASE_TAG=$VERSION" >> "$GITHUB_ENV"
+          echo "JELLYFIN_VERSION=${VERSION#v}" >> "$GITHUB_ENV"
+
+      - name: Decode keystore
+        env:
+          KEYSTORE: ${{ secrets.KEYSTORE }}
+        run: |
+          if [ -z "$KEYSTORE" ]; then
+            echo "::error::The KEYSTORE secret is not set"
+            exit 1
+          fi
+          echo "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/keystore.jks"
+
+      - name: Assemble release APK
+        env:
+          KEYSTORE_FILE: ${{ runner.temp }}/keystore.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew :app:assembleRelease
+
+      - name: Remove keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/keystore.jks"
+
+      - name: Prepare release files
+        run: |
+          mkdir -p build/fork-publish
+          APK="build/fork-publish/jellyfin-sso-${RELEASE_TAG}.apk"
+          mv app/build/outputs/apk/release/jellyfin-androidtv-*-release.apk "$APK"
+          # Fail when the APK is not signed (missing or wrong signing secrets)
+          APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)"
+          "$APKSIGNER" verify --print-certs "$APK"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --target "$GITHUB_SHA" \
+              --title "Jellyfin SSO $RELEASE_TAG" \
+              --notes "Jellyfin Android TV with authentication proxy header support (Pangolin, Cloudflare Access, ...)."
+          fi
+          gh release upload "$RELEASE_TAG" build/fork-publish/* --clobber

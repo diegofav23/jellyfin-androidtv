@@ -55,13 +55,18 @@ android {
 		release {
 			isMinifyEnabled = false
 
+			// Allow custom builds to use a different application id and name
+			applicationIdSuffix = getProperty("application.id.suffix")?.ifBlank { null }
+			val applicationName = getProperty("application.name")?.ifBlank { null }
+			val appId = namespace + applicationIdSuffix.orEmpty()
+
 			// Set package names used in various XML files
-			resValue("string", "app_id", namespace!!)
-			resValue("string", "app_search_suggest_authority", "${namespace}.content")
-			resValue("string", "app_search_suggest_intent_data", "content://${namespace}.content/intent")
+			resValue("string", "app_id", appId)
+			resValue("string", "app_search_suggest_authority", "${appId}.content")
+			resValue("string", "app_search_suggest_intent_data", "content://${appId}.content/intent")
 
 			// Set flavored application name
-			resValue("string", "app_name", "@string/app_name_release")
+			resValue("string", "app_name", applicationName ?: "@string/app_name_release")
 
 			buildConfigField("boolean", "DEVELOPMENT", "false")
 
